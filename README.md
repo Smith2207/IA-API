@@ -120,17 +120,24 @@ Busca las **5 mascotas más similares** (configurable con `SEARCH_TOP_K`).
 }
 ```
 
-**Respuesta** (lista ordenada por similitud):
+**Respuesta** (detección de la consulta + ranking por similitud):
 
 ```json
-[
-  {
-    "pet_name": "Max",
-    "similarity": 94,
-    "location": "Juliaca",
-    "image_url": "https://..."
-  }
-]
+{
+  "detection": {
+    "detected_class": "dog",
+    "confidence": 91.5
+  },
+  "matches": [
+    {
+      "pet_id": "uuid-mascota",
+      "pet_name": "Max",
+      "similarity": 94,
+      "location": "Juliaca",
+      "image_url": "https://..."
+    }
+  ]
+}
 ```
 
 ## Integración con Next.js (PawPatrol)

@@ -26,8 +26,19 @@ class RegisterResponse(BaseModel):
     message: str = "Mascota registrada en el índice de similitud visual"
 
 
+class QueryDetectionInfo(BaseModel):
+    detected_class: Optional[str] = None
+    confidence: Optional[float] = None
+
+
 class SearchResultItem(BaseModel):
+    pet_id: str
     pet_name: str
     similarity: int
     location: str = ""
     image_url: str
+
+
+class SearchResponse(BaseModel):
+    detection: QueryDetectionInfo
+    matches: List[SearchResultItem] = Field(default_factory=list)

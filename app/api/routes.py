@@ -7,8 +7,10 @@ from pydantic import ValidationError
 from app.exceptions import PetNotDetectedError
 from app.api.schemas import (
     HealthResponse,
+    QueryDetectionInfo,
     RegisterJsonRequest,
     RegisterResponse,
+    SearchResponse,
     SearchResultItem,
 )
 from app.config import get_settings
@@ -170,10 +172,10 @@ async def register_pet(request: Request) -> RegisterResponse:
 
 @router.post(
     "/search",
-    response_model=List[SearchResultItem],
+    response_model=SearchResponse,
     dependencies=[Depends(verify_api_key)],
 )
-async def search_pets(request: Request) -> List[SearchResultItem]:
+async def search_pets(request: Request) -> SearchResponse:
     """
     Compara una imagen con el índice y devuelve hasta 5 coincidencias por similitud.
     """
@@ -221,15 +223,24 @@ async def search_pets(request: Request) -> List[SearchResultItem]:
             exclude_id=exclude,
         )
 
-        return [
-            SearchResultItem(
-                pet_name=meta.get("pet_name", ""),
-                similarity=int(round(score)),
-                location=meta.get("location") or "",
-                image_url=meta.get("image_url") or "",
-            )
-            for _pet_id, score, meta in matches
-        ]
+        return SearchResponse(
+            detection=QueryDetectionInfo(
+                detected_class=detection.class_name,
+                confidence=round(detection.confidence * 100, 2)
+                if detection.confidence
+                else None,
+            ),
+            matches=[
+                SearchResultItem(
+                    pet_id=pet_id,
+                    pet_name=meta.get("pet_name", ""),
+                    similarity=int(round(score)),
+                    location=meta.get("location") or "",
+                    image_url=meta.get("image_url") or "",
+                )
+                for pet_id, score, meta in matches
+            ],
+        )
     except PetNotDetectedError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ImageLoadError as exc:
