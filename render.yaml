@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pawpatrol-ia-api
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://tu-app.vercel.app,http://localhost:3000
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_KEY
+        generateValue: true
