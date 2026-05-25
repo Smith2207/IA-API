@@ -105,13 +105,33 @@ Registra una mascota de PawPatrol en el índice visual.
 }
 ```
 
+O con base64:
+
+```json
+{
+  "pet_id": "id-mascota-pawpatroll",
+  "pet_name": "Max",
+  "location": "Juliaca",
+  "image_base64": "..."
+}
+```
+
 **Multipart:** `pet_id`, `pet_name`, `location` (opcional), `image_url` o archivo `image`.
 
 ### `POST /search`
 
 Busca las **5 mascotas más similares** (configurable con `SEARCH_TOP_K`).
 
-**JSON:**
+**JSON** (`image_url` **o** `image_base64`; recomendado desde Next.js servidor):
+
+```json
+{
+  "image_base64": "<base64 sin prefijo data: o data:image/jpeg;base64,...>",
+  "exclude_pet_id": "opcional-id-a-excluir"
+}
+```
+
+Alternativa con URL pública:
 
 ```json
 {
@@ -119,6 +139,8 @@ Busca las **5 mascotas más similares** (configurable con `SEARCH_TOP_K`).
   "exclude_pet_id": "opcional-id-a-excluir"
 }
 ```
+
+**Multipart:** `image_url` y/o archivo `image`.
 
 **Respuesta** (detección de la consulta + ranking por similitud):
 
@@ -155,7 +177,7 @@ await fetch(`${process.env.IA_API_URL}/register`, {
     pet_id: mascota.id,
     pet_name: mascota.nombre,
     location: usuario.ciudad ?? "",
-    image_url: fotoPrincipalUrl,
+    image_base64: bufferBase64,
   }),
 });
 ```
@@ -169,7 +191,7 @@ const matches = await fetch(`${process.env.IA_API_URL}/search`, {
     "Content-Type": "application/json",
     "X-API-Key": process.env.IA_API_KEY ?? "",
   },
-  body: JSON.stringify({ image_url: fotoAvistamiento }),
+  body: JSON.stringify({ image_base64: bufferBase64 }),
 }).then((r) => r.json());
 ```
 
@@ -178,7 +200,7 @@ const matches = await fetch(`${process.env.IA_API_URL}/search`, {
 1. Crea un **Web Service** con Docker o Python.
 2. Configura `DATABASE_URL` (misma Neon o base dedicada para embeddings).
 3. Añade `CORS_ORIGINS` con la URL de PawPatrol.
-4. Define `API_KEY` y envíala desde Next.js en el header `X-API-Key`.
+4. (Opcional) Define `API_KEY` en Render y la misma en PawPatrol como `IA_API_KEY`. Si no la configuras, la API acepta peticiones sin clave.
 5. Usa plan con suficiente RAM (≥ 2 GB recomendado por Torch + modelos).
 
 El archivo `render.yaml` incluye una plantilla básica.

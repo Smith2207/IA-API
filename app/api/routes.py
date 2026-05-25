@@ -1,4 +1,6 @@
+import base64
 import json
+import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
@@ -33,23 +35,56 @@ def verify_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
 
 
 class SearchJsonRequest:
-    def __init__(self, image_url: str, exclude_pet_id: Optional[str] = None):
+    def __init__(
+        self,
+        image_url: str,
+        exclude_pet_id: Optional[str] = None,
+        image_base64: Optional[str] = None,
+    ):
         self.image_url = image_url
         self.exclude_pet_id = exclude_pet_id
+        self.image_base64 = image_base64
 
 
 async def _parse_search_json(request: Request) -> SearchJsonRequest:
     from pydantic import BaseModel, HttpUrl
 
     class _Body(BaseModel):
-        image_url: HttpUrl
+        image_url: Optional[HttpUrl] = None
+        image_base64: Optional[str] = None
         exclude_pet_id: Optional[str] = None
 
     payload = _Body.model_validate(await request.json())
-    return SearchJsonRequest(
-        image_url=str(payload.image_url),
-        exclude_pet_id=payload.exclude_pet_id,
+    if payload.image_url:
+        return SearchJsonRequest(
+            image_url=str(payload.image_url),
+            exclude_pet_id=payload.exclude_pet_id,
+        )
+    if payload.image_base64:
+        return SearchJsonRequest(
+            image_url="__base64__",
+            exclude_pet_id=payload.exclude_pet_id,
+            image_base64=payload.image_base64,
+        )
+    raise HTTPException(
+        status_code=400,
+        detail="Envía image_url o image_base64 en el JSON.",
     )
+
+
+def _decode_base64_image(raw: str) -> bytes:
+    text = raw.strip()
+    if text.startswith("data:"):
+        match = re.match(r"^data:image/[^;]+;base64,(.+)$", text, re.DOTALL)
+        if not match:
+            raise HTTPException(status_code=400, detail="image_base64 no válido.")
+        text = match.group(1)
+    try:
+        return base64.b64decode(text, validate=True)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail="image_base64 no es base64 válido."
+        ) from exc
 
 
 async def _load_image_from_request(
@@ -102,12 +137,22 @@ async def register_pet(request: Request) -> RegisterResponse:
     try:
         if "application/json" in content_type:
             body = RegisterJsonRequest.model_validate(await request.json())
-            img = await load_image_from_url(str(body.image_url))
+            if body.image_base64:
+                img = load_image_from_bytes(_decode_base64_image(body.image_base64))
+                resolved_url = f"upload://{body.pet_id}"
+            elif body.image_url:
+                img = await load_image_from_url(str(body.image_url))
+                resolved_url = str(body.image_url)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Envía image_url o image_base64 en el JSON.",
+                )
             result = service.register(
                 pet_id=body.pet_id,
                 pet_name=body.pet_name,
                 location=body.location,
-                image_url=str(body.image_url),
+                image_url=resolved_url,
                 image=img,
             )
         elif "multipart/form-data" in content_type:
@@ -189,7 +234,12 @@ async def search_pets(request: Request) -> SearchResponse:
 
         if "application/json" in content_type:
             search_body = await _parse_search_json(request)
-            img = await load_image_from_url(search_body.image_url)
+            if search_body.image_base64:
+                img = load_image_from_bytes(
+                    _decode_base64_image(search_body.image_base64)
+                )
+            else:
+                img = await load_image_from_url(search_body.image_url)
             exclude = search_body.exclude_pet_id
         elif "multipart/form-data" in content_type:
             form = await request.form()

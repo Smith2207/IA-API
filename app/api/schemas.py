@@ -14,7 +14,11 @@ class RegisterJsonRequest(BaseModel):
     pet_id: str = Field(..., min_length=1, max_length=128)
     pet_name: str = Field(..., min_length=1, max_length=200)
     location: Optional[str] = Field(default=None, max_length=300)
-    image_url: HttpUrl
+    image_url: Optional[HttpUrl] = None
+    image_base64: Optional[str] = Field(
+        default=None,
+        description="Imagen en base64 (recomendado desde PawPatroll)",
+    )
 
 
 class RegisterResponse(BaseModel):
